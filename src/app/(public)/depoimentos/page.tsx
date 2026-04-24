@@ -1,22 +1,42 @@
 import { Star } from "lucide-react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+import type { Testimonial } from "@/lib/supabase/types";
 
 export const metadata = {
   title: "Depoimentos | Revendendo Make",
   description: "Veja o que nossas revendedoras falam sobre a Revendendo Make.",
 };
 
-const testimonials = [
-  { id: 1, name: "Ana Paula S.", city: "São Paulo, SP", result: "R$ 2.400 no 1° mês", avatar: "👩", stars: 5, text: "Nunca pensei que ia ganhar tanto dinheiro vendendo maquiagem. Os produtos são incríveis e as clientes adoram. Recomendo muito!" },
-  { id: 2, name: "Mariana C.", city: "Belo Horizonte, MG", result: "50 clientes em 3 meses", avatar: "👩‍🦰", stars: 5, text: "A qualidade dos produtos fala por si só. Minhas clientes me indicam para amigas e a cartela só cresce." },
-  { id: 3, name: "Juliana R.", city: "Recife, PE", result: "R$ 1.800/mês de renda extra", avatar: "👩‍🦱", stars: 5, text: "Comecei com medo, mas o suporte da equipe me deu confiança. Hoje tenho uma renda extra consistente." },
-  { id: 4, name: "Fernanda M.", city: "Curitiba, PR", result: "Deixou o emprego fixo", avatar: "👩‍💼", stars: 5, text: "Em 6 meses faturando como revendedora, consegui largar meu emprego CLT. Hoje sou minha própria chefe!" },
-  { id: 5, name: "Carla B.", city: "Salvador, BA", result: "R$ 3.500/mês", avatar: "👩‍🦳", stars: 5, text: "Comecei as vendas no WhatsApp e no Instagram. Em pouco tempo minhas clientes me procuram sozinhas." },
-  { id: 6, name: "Patricia N.", city: "Porto Alegre, RS", result: "100+ clientes fiéis", avatar: "🧕", stars: 5, text: "Os produtos vendem sozinhos porque a qualidade é real. Minha clientela cresceu organicamente — boca a boca." },
-];
+async function getTestimonials(): Promise<Testimonial[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  const { data } = await supabase
+    .from("testimonials")
+    .select("*")
+    .eq("approved", true)
+    .order("display_order", { ascending: true })
+    .order("created_at", { ascending: false });
+  return (data ?? []) as Testimonial[];
+}
 
-export default function DepoimentosPage() {
+const fallbackTestimonials = [
+  { id: "1", reseller_name: "Ana Paula S.", city: "São Paulo, SP", result_text: "Nunca pensei que ia ganhar tanto dinheiro vendendo maquiagem. Os produtos são incríveis e as clientes adoram. Recomendo muito!", rating: 5, approved: true, display_order: 0, created_at: "", photo_url: null },
+  { id: "2", reseller_name: "Mariana C.", city: "Belo Horizonte, MG", result_text: "A qualidade dos produtos fala por si só. Minhas clientes me indicam para amigas e a cartela só cresce.", rating: 5, approved: true, display_order: 1, created_at: "", photo_url: null },
+  { id: "3", reseller_name: "Juliana R.", city: "Recife, PE", result_text: "Comecei com medo, mas o suporte da equipe me deu confiança. Hoje tenho uma renda extra consistente.", rating: 5, approved: true, display_order: 2, created_at: "", photo_url: null },
+  { id: "4", reseller_name: "Fernanda M.", city: "Curitiba, PR", result_text: "Em 6 meses faturando como revendedora, consegui largar meu emprego CLT. Hoje sou minha própria chefe!", rating: 5, approved: true, display_order: 3, created_at: "", photo_url: null },
+  { id: "5", reseller_name: "Carla B.", city: "Salvador, BA", result_text: "Comecei as vendas no WhatsApp e no Instagram. Em pouco tempo minhas clientes me procuram sozinhas.", rating: 5, approved: true, display_order: 4, created_at: "", photo_url: null },
+  { id: "6", reseller_name: "Patricia N.", city: "Porto Alegre, RS", result_text: "Os produtos vendem sozinhos porque a qualidade é real. Minha clientela cresceu organicamente — boca a boca.", rating: 5, approved: true, display_order: 5, created_at: "", photo_url: null },
+] as Testimonial[];
+
+export default async function DepoimentosPage() {
+  const dbTestimonials = await getTestimonials();
+  const testimonials = dbTestimonials.length > 0 ? dbTestimonials : fallbackTestimonials;
+
   return (
     <div className="min-h-screen">
       <section className="bg-gradient-to-br from-primary-50 to-white py-12 md:py-16 border-b border-neutral-100">
@@ -35,27 +55,23 @@ export default function DepoimentosPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {testimonials.map((t) => (
-              <div
-                key={t.id}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-100"
-              >
+              <div key={t.id} className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-100">
                 <div className="flex gap-1 mb-4">
-                  {Array.from({ length: t.stars }).map((_, i) => (
+                  {Array.from({ length: t.rating }).map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-secondary-400 text-secondary-400" />
                   ))}
                 </div>
                 <p className="text-neutral-700 leading-relaxed mb-5 italic">
-                  &ldquo;{t.text}&rdquo;
+                  &ldquo;{t.result_text}&rdquo;
                 </p>
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl" role="img" aria-label={t.name}>{t.avatar}</span>
+                  <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    {t.reseller_name.charAt(0)}
+                  </div>
                   <div>
-                    <p className="font-semibold text-neutral-900">{t.name}</p>
+                    <p className="font-semibold text-neutral-900">{t.reseller_name}</p>
                     <p className="text-sm text-neutral-500">{t.city}</p>
                   </div>
-                </div>
-                <div className="mt-3 bg-primary-50 text-primary-700 text-xs font-semibold px-3 py-1 rounded-full inline-block">
-                  {t.result}
                 </div>
               </div>
             ))}
