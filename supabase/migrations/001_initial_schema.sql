@@ -1,9 +1,6 @@
--- Enable UUID extension
-create extension if not exists "uuid-ossp";
-
 -- Categories
 create table public.categories (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
   created_at timestamptz not null default now()
@@ -11,7 +8,7 @@ create table public.categories (
 
 -- Products
 create table public.products (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   description text,
   images text[] not null default '{}',
@@ -29,7 +26,7 @@ create index idx_products_category on public.products(category_id);
 
 -- Leads
 create table public.leads (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   phone text not null,
   city text,
@@ -46,7 +43,7 @@ create index idx_leads_created on public.leads(created_at desc);
 
 -- Testimonials
 create table public.testimonials (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   reseller_name text not null,
   city text,
   photo_url text,
@@ -59,7 +56,7 @@ create table public.testimonials (
 
 -- Posts (blog)
 create table public.posts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   title text not null,
   slug text not null unique,
   content jsonb,
