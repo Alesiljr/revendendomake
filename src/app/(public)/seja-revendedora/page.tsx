@@ -71,10 +71,25 @@ export default function SejaRevendedoraPage() {
       return;
     }
     setSubmitting(true);
-    // Simulate async — real submission goes to /api/leads (Story 2.2)
-    await new Promise((res) => setTimeout(res, 1200));
-    setSubmitting(false);
-    setSuccess(true);
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          city: form.city.trim(),
+          source: "seja-revendedora",
+          lgpd_consent: form.lgpd,
+        }),
+      });
+      if (!res.ok) throw new Error("Erro ao enviar");
+      setSuccess(true);
+    } catch {
+      setErrors({ name: "Ocorreu um erro. Tente novamente." });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
