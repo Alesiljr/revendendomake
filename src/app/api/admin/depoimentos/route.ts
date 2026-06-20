@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/supabase/require-admin";
 
-function db(): any { // eslint-disable-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function db(): any {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -9,6 +11,9 @@ function db(): any { // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const { reseller_name, city, result_text, rating, approved } = body;
 
@@ -19,16 +24,16 @@ export async function POST(request: Request) {
   const { data, error } = await db()
     .from("testimonials")
     .insert({
-      reseller_name,
-      city: city || null,
-      result_text,
-      rating: Number(rating) || 5,
+      reseller_name: String(reseller_name).slice(0, 100),
+      city: city ? String(city).slice(0, 100) : null,
+      result_text: String(result_text).slice(0, 1000),
+      rating: Math.min(5, Math.max(1, Number(rating) || 5)),
       approved: Boolean(approved),
       display_order: 0,
     })
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Erro ao criar depoimento." }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
 }

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { DemoBanner } from "@/components/admin/demo-banner";
+import { AdminSidebarFooter } from "@/components/admin/sidebar-footer";
+import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import {
   LayoutDashboard,
   Package,
@@ -7,12 +9,13 @@ import {
   Star,
   FileText,
   Settings,
-  LogOut,
   Sparkles,
+  BarChart2,
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart2 },
   { href: "/admin/produtos", label: "Produtos", icon: Package },
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/depoimentos", label: "Depoimentos", icon: Star },
@@ -25,12 +28,14 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const demoMode = !isSupabaseConfigured();
+
   return (
     <div className="min-h-screen bg-neutral-50">
-      <DemoBanner />
+      {demoMode && <DemoBanner />}
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 min-h-[calc(100vh-36px)] bg-white border-r border-neutral-200 flex flex-col">
+        <aside className="w-64 min-h-screen bg-white border-r border-neutral-200 flex flex-col">
           {/* Logo */}
           <div className="p-6 border-b border-neutral-100">
             <div className="flex items-center gap-2">
@@ -54,16 +59,8 @@ export default function AdminLayout({
               </Link>
             ))}
           </nav>
-          {/* Footer */}
-          <div className="p-4 border-t border-neutral-100">
-            <Link
-              href="/"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-neutral-500 hover:text-primary-700 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              Ver Site
-            </Link>
-          </div>
+          {/* Footer with logout */}
+          <AdminSidebarFooter demoMode={demoMode} />
         </aside>
         {/* Main content */}
         <main className="flex-1 p-8">{children}</main>

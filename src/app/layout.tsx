@@ -17,16 +17,44 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Revendendo Make — Ganhe Dinheiro Revendendo Maquiagem",
+  title: {
+    default: "Revendendo Make | Lucre R$ 1.500 a R$ 3.000/mês Revendendo Maquiagem",
+    template: "%s | Revendendo Make",
+  },
   description:
-    "Seja revendedora de maquiagem e ganhe renda extra em casa. Produtos de qualidade, suporte completo e as melhores margens do mercado.",
-  keywords:
-    "revendedora maquiagem, ganhar dinheiro em casa, revenda cosméticos",
+    "Mais de 500 mulheres já estão lucrando de R$ 1.500 a R$ 3.000 por mês revendendo maquiagem de qualidade pelo celular. Sem estoque, sem experiência, cadastro gratuito. Comece hoje!",
+  keywords: [
+    "revendedora de maquiagem",
+    "revenda make",
+    "ganhar dinheiro com maquiagem",
+    "renda extra mulher",
+    "como revender cosméticos",
+    "trabalhar em casa venda maquiagem",
+    "renda extra sem sair de casa",
+  ],
+  authors: [{ name: "Revendendo Make" }],
+  creator: "Revendendo Make",
+  metadataBase: new URL("https://revendendomake.com.br"),
   openGraph: {
-    title: "Revendendo Make",
-    description: "Ganhe dinheiro revendendo maquiagem de qualidade",
+    title: "Revendendo Make | R$ 1.500 a R$ 3.000/mês Revendendo Maquiagem",
+    description:
+      "500+ mulheres lucrando de casa. Sem estoque, sem experiência, 100% pelo celular. Cadastro gratuito.",
     type: "website",
     locale: "pt_BR",
+    siteName: "Revendendo Make",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Revendendo Make | Lucre Revendendo Maquiagem de Casa",
+    description: "500+ mulheres lucrando de R$ 1.500 a R$ 3.000/mês. Cadastro gratuito.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
   },
 };
 
