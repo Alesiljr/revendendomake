@@ -21,7 +21,9 @@ export default function PublicLayout({
             </span>
           </Link>
           <a
-            href="#oferta"
+            href="https://checkout.perfectpay.com.br/pay/PPU38CPONGJ"
+            target="_blank"
+            rel="noopener noreferrer"
             data-track="cta-header-quero-comecar"
             className="inline-flex items-center gap-1 bg-primary hover:bg-primary-800 text-white text-xs md:text-sm font-bold px-3 py-2 md:px-5 md:py-2.5 rounded-lg transition-all duration-200 hover:scale-105 shadow whitespace-nowrap"
           >
