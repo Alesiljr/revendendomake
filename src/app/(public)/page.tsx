@@ -381,7 +381,9 @@ function SolutionSection() {
 
         <div className="text-center">
           <a
-            href="#oferta"
+            href="https://checkout.perfectpay.com.br/pay/PPU38CPONGJ"
+            target="_blank"
+            rel="noopener noreferrer"
             data-track="cta-solution-quero-essa-oportunidade"
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary-800 text-white font-extrabold text-sm md:text-lg px-6 py-3 md:px-12 md:py-5 rounded-xl shadow-lg transition-all duration-200 hover:scale-105"
           >
@@ -480,7 +482,9 @@ function HowItWorksSection() {
 
         <div className="text-center">
           <a
-            href="#oferta"
+            href="https://checkout.perfectpay.com.br/pay/PPU38CPONGJ"
+            target="_blank"
+            rel="noopener noreferrer"
             data-track="cta-howitworks-comecar-agora"
             className="inline-flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 text-neutral-900 font-extrabold text-sm md:text-lg px-6 py-3 md:px-12 md:py-5 rounded-xl shadow-2xl transition-all duration-200 hover:scale-105"
           >
@@ -592,7 +596,9 @@ function ProductsSection() {
 
         <div className="text-center">
           <a
-            href="#oferta"
+            href="https://checkout.perfectpay.com.br/pay/PPU38CPONGJ"
+            target="_blank"
+            rel="noopener noreferrer"
             data-track="cta-products-quero-revender"
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary-800 text-white font-extrabold text-sm md:text-lg px-6 py-3 md:px-12 md:py-5 rounded-xl shadow-lg transition-all duration-200 hover:scale-105"
           >
