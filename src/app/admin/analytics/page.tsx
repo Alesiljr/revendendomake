@@ -1,12 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, MousePointerClick, Eye, TrendingUp, RefreshCw } from "lucide-react";
+import {
+  Users, MousePointerClick, Eye, TrendingUp, RefreshCw,
+  MapPin, Flame, BarChart3, ExternalLink, CheckCircle, AlertCircle,
+  Smartphone, Monitor, Tablet, Globe,
+} from "lucide-react";
 
 interface TopPage { path: string; count: number }
 interface TopButton { name: string; count: number }
 interface DayCount { date: string; count: number }
-interface RecentEvent { session_id: string; event_type: string; event_name: string | null; page_path: string | null; created_at: string }
+interface RecentEvent {
+  session_id: string; event_type: string;
+  event_name: string | null; page_path: string | null; created_at: string
+}
+interface StateCount { state: string; stateName: string; count: number; pct: number }
+interface HeatmapData { grid: number[][]; rows: number; cols: number; maxCount: number }
+interface DeviceCount { device: "mobile" | "tablet" | "desktop"; count: number; pct: number }
+interface TrafficSource { source: string; count: number; pct: number }
 
 interface AnalyticsData {
   period: string;
@@ -17,13 +28,249 @@ interface AnalyticsData {
   topButtons: TopButton[];
   byDay: DayCount[];
   recentEvents: RecentEvent[];
+  stateDistribution: StateCount[];
+  clickHeatmap: HeatmapData;
+  totalWithGeo: number;
+  deviceDistribution: DeviceCount[];
+  totalWithDevice: number;
+  trafficSources: TrafficSource[];
 }
 
 const PERIODS = [
-  { label: "7 dias", value: 7 },
+  { label: "Hoje",   value: 1  },
+  { label: "7 dias", value: 7  },
+  { label: "15 dias", value: 15 },
   { label: "30 dias", value: 30 },
-  { label: "90 dias", value: 90 },
 ];
+
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID;
+
+// ── Heatmap ──────────────────────────────────────────────────────────────────
+
+function heatColor(count: number, max: number): string {
+  if (count === 0) return "rgb(243,244,246)";
+  const t = count / max;
+  if (t < 0.2) return "rgb(219,234,254)";
+  if (t < 0.4) return "rgb(134,239,172)";
+  if (t < 0.6) return "rgb(253,224,71)";
+  if (t < 0.8) return "rgb(251,146,60)";
+  return "rgb(239,68,68)";
+}
+
+function HeatmapGrid({ data }: { data: HeatmapData }) {
+  const { grid, rows, cols, maxCount } = data;
+  const hasData = grid.flat().some((v) => v > 0);
+
+  if (!hasData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-neutral-400">
+        <Flame className="w-8 h-8 mb-2 opacity-30" />
+        <p className="text-sm">Sem dados de clique ainda.</p>
+        <p className="text-xs mt-1 text-center">
+          Cliques em botões com <code className="bg-neutral-100 px-1 rounded">data-track</code> geram o mapa.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-3 items-start">
+        <div className="flex flex-col justify-between text-xs text-neutral-400 shrink-0 select-none" style={{ height: rows * 14 + (rows - 1) }}>
+          <span>Topo</span>
+          <span>50%</span>
+          <span>Fim</span>
+        </div>
+        <div
+          className="flex-1 grid gap-px bg-neutral-200 rounded overflow-hidden"
+          style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        >
+          {grid.map((row, r) =>
+            row.map((count, c) => (
+              <div
+                key={`${r}-${c}`}
+                style={{ height: 14, backgroundColor: heatColor(count, maxCount) }}
+                title={count > 0 ? `${count} clique${count !== 1 ? "s" : ""}` : undefined}
+                className="cursor-default transition-opacity hover:opacity-80"
+              />
+            ))
+          )}
+        </div>
+      </div>
+      <div className="flex justify-between text-xs text-neutral-400 pl-8 select-none">
+        <span>Esquerda</span>
+        <span>Centro</span>
+        <span>Direita</span>
+      </div>
+      <div className="flex items-center gap-3 pl-8 flex-wrap">
+        <span className="text-xs text-neutral-400">Intensidade:</span>
+        {[
+          { color: "rgb(219,234,254)", label: "baixa" },
+          { color: "rgb(253,224,71)", label: "média" },
+          { color: "rgb(239,68,68)", label: "alta" },
+        ].map((l) => (
+          <span key={l.label} className="flex items-center gap-1 text-xs text-neutral-500">
+            <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: l.color }} />
+            {l.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Device distribution ──────────────────────────────────────────────────────
+
+const DEVICE_META = {
+  mobile:  { label: "Mobile",  Icon: Smartphone, color: "text-pink-600",   bg: "bg-pink-50",   bar: "bg-pink-500" },
+  tablet:  { label: "Tablet",  Icon: Tablet,     color: "text-amber-600",  bg: "bg-amber-50",  bar: "bg-amber-500" },
+  desktop: { label: "Desktop", Icon: Monitor,    color: "text-blue-600",   bg: "bg-blue-50",   bar: "bg-blue-500" },
+} as const;
+
+function DeviceChart({ data, total }: { data: DeviceCount[]; total: number }) {
+  if (total === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-neutral-400">
+        <Monitor className="w-8 h-8 mb-2 opacity-30" />
+        <p className="text-sm">Sem dados de dispositivo ainda.</p>
+        <p className="text-xs mt-1 text-center">Os próximos acessos ao site serão identificados automaticamente.</p>
+      </div>
+    );
+  }
+
+  const maxCount = Math.max(...data.map((d) => d.count), 1);
+
+  return (
+    <div className="space-y-4">
+      {/* Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {data.map(({ device, count, pct }) => {
+          const meta = DEVICE_META[device];
+          return (
+            <div key={device} className={`rounded-xl p-4 ${meta.bg} flex flex-col items-center gap-1`}>
+              <meta.Icon className={`w-5 h-5 ${meta.color}`} />
+              <p className={`text-xl font-bold ${meta.color}`}>{pct}%</p>
+              <p className="text-xs font-medium text-neutral-600">{meta.label}</p>
+              <p className="text-xs text-neutral-400">{count} sessão{count !== 1 ? "ões" : ""}</p>
+            </div>
+          );
+        })}
+      </div>
+      {/* Bars */}
+      <div className="space-y-2">
+        {data.map(({ device, count }) => {
+          const meta = DEVICE_META[device];
+          return (
+            <div key={device} className="flex items-center gap-3">
+              <meta.Icon className={`w-4 h-4 ${meta.color} shrink-0`} />
+              <span className="text-xs text-neutral-600 w-14 shrink-0">{meta.label}</span>
+              <div className="flex-1 bg-neutral-100 rounded-full h-3 overflow-hidden">
+                <div
+                  className={`h-full ${meta.bar} rounded-full transition-all`}
+                  style={{ width: `${Math.round((count / maxCount) * 100)}%` }}
+                />
+              </div>
+              <span className="text-xs font-semibold text-neutral-600 w-8 text-right">{count}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-xs text-neutral-400">{total} sessão{total !== 1 ? "ões" : ""} identificadas no período.</p>
+    </div>
+  );
+}
+
+// ── Traffic sources ──────────────────────────────────────────────────────────
+
+const SOURCE_COLORS: Record<string, string> = {
+  "Direto":               "bg-neutral-400",
+  "Google":               "bg-blue-500",
+  "Facebook / Instagram": "bg-pink-500",
+  "TikTok":               "bg-purple-500",
+  "WhatsApp":             "bg-green-500",
+  "YouTube":              "bg-red-500",
+  "Twitter / X":          "bg-sky-500",
+  "Bing":                 "bg-teal-500",
+  "Pinterest":            "bg-rose-500",
+  "Outros":               "bg-amber-500",
+};
+
+function TrafficSourceChart({ data }: { data: TrafficSource[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-neutral-400">
+        <Globe className="w-8 h-8 mb-2 opacity-30" />
+        <p className="text-sm">Sem dados de tráfego ainda.</p>
+      </div>
+    );
+  }
+
+  const maxCount = data[0]?.count ?? 1;
+
+  return (
+    <div className="space-y-2">
+      {data.map(({ source, count, pct }) => {
+        const barColor = SOURCE_COLORS[source] ?? "bg-neutral-400";
+        return (
+          <div key={source} className="flex items-center gap-3">
+            <span className="text-xs text-neutral-600 w-36 shrink-0 truncate">{source}</span>
+            <div className="flex-1 bg-neutral-100 rounded-full h-4 overflow-hidden">
+              <div
+                className={`h-full ${barColor} rounded-full transition-all`}
+                style={{ width: `${Math.round((count / maxCount) * 100)}%` }}
+              />
+            </div>
+            <span className="text-xs font-semibold text-neutral-600 w-8 text-right">{count}</span>
+            <span className="text-xs text-neutral-400 w-8 text-right">{pct}%</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── State bar chart ──────────────────────────────────────────────────────────
+
+function StateChart({ data, total }: { data: StateCount[]; total: number }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-neutral-400">
+        <MapPin className="w-8 h-8 mb-2 opacity-30" />
+        <p className="text-sm">Sem dados de geolocalização ainda.</p>
+        <p className="text-xs mt-1 text-center">
+          Os próximos acessos serão geolocalizados automaticamente por IP após o deploy.
+        </p>
+      </div>
+    );
+  }
+
+  const maxCount = data[0]?.count ?? 1;
+
+  return (
+    <div className="space-y-2">
+      {data.map((s) => (
+        <div key={s.state} className="flex items-center gap-3">
+          <span className="text-xs font-bold text-neutral-500 w-6 shrink-0 text-right">{s.state}</span>
+          <span className="text-xs text-neutral-600 w-28 shrink-0 truncate">{s.stateName}</span>
+          <div className="flex-1 bg-neutral-100 rounded-full h-4 overflow-hidden">
+            <div
+              className="h-full bg-primary-500 rounded-full transition-all"
+              style={{ width: `${Math.round((s.count / maxCount) * 100)}%` }}
+            />
+          </div>
+          <span className="text-xs font-semibold text-neutral-600 w-8 text-right">{s.count}</span>
+          <span className="text-xs text-neutral-400 w-8 text-right">{s.pct}%</span>
+        </div>
+      ))}
+      <p className="text-xs text-neutral-400 pt-1">
+        {total} sessão{total !== 1 ? "ões" : ""} geolocalizadas no período.
+      </p>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -44,6 +291,7 @@ export default function AnalyticsPage() {
   useEffect(() => { load(days); }, [days]);
 
   const maxDay = data ? Math.max(...data.byDay.map((d) => d.count), 1) : 1;
+  const periodLabel = days === 1 ? "hoje" : `últimos ${days} dias`;
 
   return (
     <div className="space-y-8">
@@ -51,7 +299,7 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Analytics</h1>
-          <p className="text-sm text-neutral-500 mt-1">Acessos e cliques no site</p>
+          <p className="text-sm text-neutral-500 mt-1">Acessos, dispositivos, localização e mapa de calor</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg">
@@ -86,7 +334,7 @@ export default function AnalyticsPage() {
 
       {data && (
         <>
-          {/* KPI cards */}
+          {/* ── KPI cards ──────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
               <div className="flex items-center gap-3 mb-3">
@@ -96,7 +344,7 @@ export default function AnalyticsPage() {
                 <span className="text-sm font-medium text-neutral-500">Visitantes únicos</span>
               </div>
               <p className="text-3xl font-bold text-neutral-900">{data.uniqueVisitors.toLocaleString("pt-BR")}</p>
-              <p className="text-xs text-neutral-400 mt-1">últimos {days} dias</p>
+              <p className="text-xs text-neutral-400 mt-1">{periodLabel}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
@@ -107,7 +355,7 @@ export default function AnalyticsPage() {
                 <span className="text-sm font-medium text-neutral-500">Pageviews</span>
               </div>
               <p className="text-3xl font-bold text-neutral-900">{data.pageViews.toLocaleString("pt-BR")}</p>
-              <p className="text-xs text-neutral-400 mt-1">últimos {days} dias</p>
+              <p className="text-xs text-neutral-400 mt-1">{periodLabel}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
@@ -118,13 +366,52 @@ export default function AnalyticsPage() {
                 <span className="text-sm font-medium text-neutral-500">Cliques em botões</span>
               </div>
               <p className="text-3xl font-bold text-neutral-900">{data.totalClicks.toLocaleString("pt-BR")}</p>
-              <p className="text-xs text-neutral-400 mt-1">últimos {days} dias</p>
+              <p className="text-xs text-neutral-400 mt-1">{periodLabel}</p>
             </div>
           </div>
 
-          {/* Chart + top buttons */}
+          {/* ── Fontes de tráfego ───────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Globe className="w-4 h-4 text-blue-500" />
+              <h2 className="text-sm font-semibold text-neutral-700">Fontes de Tráfego</h2>
+              <span className="ml-auto text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-medium">dados existentes</span>
+            </div>
+            <p className="text-xs text-neutral-400 mb-4">
+              De onde os visitantes chegam — calculado pelo referrer já registrado no banco.
+            </p>
+            <TrafficSourceChart data={data.trafficSources} />
+          </div>
+
+          {/* ── Dispositivos + Geolocalização ────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Bar chart by day */}
+            <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <Smartphone className="w-4 h-4 text-pink-500" />
+                <h2 className="text-sm font-semibold text-neutral-700">Dispositivos</h2>
+                <span className="ml-auto text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">acumula após deploy</span>
+              </div>
+              <p className="text-xs text-neutral-400 mb-4">
+                Mobile, tablet ou desktop — populado automaticamente nos próximos acessos.
+              </p>
+              <DeviceChart data={data.deviceDistribution} total={data.totalWithDevice} />
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-4 h-4 text-green-500" />
+                <h2 className="text-sm font-semibold text-neutral-700">Visitantes por Estado</h2>
+                <span className="ml-auto text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">acumula após deploy</span>
+              </div>
+              <p className="text-xs text-neutral-400 mb-4">
+                Geolocalização por IP — para segmentar campanhas regionais.
+              </p>
+              <StateChart data={data.stateDistribution} total={data.totalWithGeo} />
+            </div>
+          </div>
+
+          {/* ── Chart + top buttons ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-4 h-4 text-neutral-400" />
@@ -152,7 +439,6 @@ export default function AnalyticsPage() {
               )}
             </div>
 
-            {/* Top buttons */}
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <MousePointerClick className="w-4 h-4 text-neutral-400" />
@@ -176,9 +462,8 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Top pages + recent events */}
+          {/* ── Top pages + recent events ────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top pages */}
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
               <h2 className="text-sm font-semibold text-neutral-700 mb-4">Páginas mais visitadas</h2>
               {data.topPages.length === 0 ? (
@@ -196,7 +481,6 @@ export default function AnalyticsPage() {
               )}
             </div>
 
-            {/* Recent events */}
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
               <h2 className="text-sm font-semibold text-neutral-700 mb-4">Eventos recentes (24h)</h2>
               {data.recentEvents.length === 0 ? (
@@ -206,9 +490,7 @@ export default function AnalyticsPage() {
                   {data.recentEvents.map((e, i) => (
                     <div key={i} className="flex items-start gap-3 py-2">
                       <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${
-                        e.event_type === "pageview"
-                          ? "bg-blue-50 text-blue-600"
-                          : "bg-pink-50 text-pink-600"
+                        e.event_type === "pageview" ? "bg-blue-50 text-blue-600" : "bg-pink-50 text-pink-600"
                       }`}>
                         {e.event_type === "pageview" ? "view" : "click"}
                       </span>
@@ -218,16 +500,94 @@ export default function AnalyticsPage() {
                         </p>
                         <p className="text-xs text-neutral-400">
                           {new Date(e.created_at).toLocaleString("pt-BR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            day: "2-digit",
-                            month: "short",
+                            hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short",
                           })}
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Heatmap ──────────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Flame className="w-4 h-4 text-orange-400" />
+              <h2 className="text-sm font-semibold text-neutral-700">Mapa de Calor de Cliques</h2>
+            </div>
+            <p className="text-xs text-neutral-400 mb-4">
+              Posição relativa dos cliques na página — eixo Y = altura da página (topo → fim), eixo X = largura.
+            </p>
+            <HeatmapGrid data={data.clickHeatmap} />
+          </div>
+
+          {/* ── Integrações externas ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-blue-500" />
+                <h2 className="text-sm font-semibold text-neutral-700">Google Analytics</h2>
+                {GA_ID ? (
+                  <span className="ml-auto flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                    <CheckCircle className="w-3 h-3" /> Ativo
+                  </span>
+                ) : (
+                  <span className="ml-auto flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                    <AlertCircle className="w-3 h-3" /> Não configurado
+                  </span>
+                )}
+              </div>
+              {GA_ID ? (
+                <>
+                  <p className="text-xs text-neutral-500 mb-1">Measurement ID</p>
+                  <code className="text-xs bg-neutral-100 px-2 py-1 rounded font-mono text-neutral-700">{GA_ID}</code>
+                  <a
+                    href="https://analytics.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+                  >
+                    Abrir Google Analytics <ExternalLink className="w-3 h-3" />
+                  </a>
+                </>
+              ) : (
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Adicione <code className="bg-neutral-100 px-1 rounded">NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX</code> no{" "}
+                  <code className="bg-neutral-100 px-1 rounded">.env.local</code> para ativar.
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Flame className="w-4 h-4 text-purple-500" />
+                <h2 className="text-sm font-semibold text-neutral-700">Microsoft Clarity</h2>
+                {CLARITY_ID ? (
+                  <span className="ml-auto flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                    <CheckCircle className="w-3 h-3" /> Ativo
+                  </span>
+                ) : (
+                  <span className="ml-auto flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                    <AlertCircle className="w-3 h-3" /> Não configurado
+                  </span>
+                )}
+              </div>
+              {CLARITY_ID ? (
+                <a
+                  href="https://clarity.microsoft.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-purple-600 hover:underline"
+                >
+                  Abrir Clarity (heatmaps avançados) <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Adicione <code className="bg-neutral-100 px-1 rounded">NEXT_PUBLIC_CLARITY_ID=xxxxxxxxxx</code> no{" "}
+                  <code className="bg-neutral-100 px-1 rounded">.env.local</code> para ativar gravações de sessão e heatmaps avançados.
+                </p>
               )}
             </div>
           </div>

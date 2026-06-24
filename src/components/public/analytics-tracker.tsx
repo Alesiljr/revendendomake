@@ -13,7 +13,14 @@ function getSessionId(): string {
   return sid;
 }
 
-function send(payload: Record<string, string>) {
+function detectDevice(): "mobile" | "tablet" | "desktop" {
+  const ua = navigator.userAgent;
+  if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
+  if (/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
+function send(payload: Record<string, string | number>) {
   if (typeof window === "undefined") return;
   const session_id = getSessionId();
   fetch("/api/analytics", {
@@ -27,7 +34,6 @@ export function AnalyticsTracker() {
   const pathname = usePathname();
   const lastPath = useRef<string | null>(null);
 
-  // Track page views on route change
   useEffect(() => {
     if (lastPath.current === pathname) return;
     lastPath.current = pathname;
@@ -35,19 +41,30 @@ export function AnalyticsTracker() {
       event_type: "pageview",
       page_path: pathname,
       referrer: document.referrer,
+      device_type: detectDevice(),
     });
   }, [pathname]);
 
-  // Track button/link clicks with data-track attribute
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = (e.target as HTMLElement).closest("[data-track]");
       if (!target) return;
       const eventName = target.getAttribute("data-track") ?? "unknown";
+
+      const x = window.innerWidth > 0
+        ? Math.round((e.clientX / window.innerWidth) * 100 * 10) / 10
+        : 0;
+      const pageHeight = document.body.scrollHeight;
+      const y = pageHeight > 0
+        ? Math.round(((window.scrollY + e.clientY) / pageHeight) * 100 * 10) / 10
+        : 0;
+
       send({
         event_type: "click",
         event_name: eventName,
         page_path: window.location.pathname,
+        click_x: x,
+        click_y: y,
       });
     }
 
