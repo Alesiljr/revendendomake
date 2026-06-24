@@ -37,11 +37,18 @@ interface AnalyticsData {
 }
 
 const PERIODS = [
-  { label: "Hoje",   value: 1  },
-  { label: "7 dias", value: 7  },
-  { label: "15 dias", value: 15 },
-  { label: "30 dias", value: 30 },
+  { label: "Hoje",   days: 1  },
+  { label: "7 dias", days: 7  },
+  { label: "15 dias", days: 15 },
+  { label: "30 dias", days: 30 },
 ];
+
+function toInputDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function todayStr() { return toInputDate(new Date()); }
+function daysAgoStr(n: number) { return toInputDate(new Date(Date.now() - n * 86400000)); }
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID;
@@ -273,42 +280,90 @@ function StateChart({ data, total }: { data: StateCount[]; total: number }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [days, setDays] = useState(7);
+  const [data, setData]       = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeDays, setActiveDays] = useState<number | null>(7);
+  const [fromDate, setFromDate] = useState(daysAgoStr(7));
+  const [toDate, setToDate]     = useState(todayStr());
 
-  async function load(d: number) {
+  async function load(params: { days?: number; from?: string; to?: string }) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/analytics?days=${d}`);
-      const json = await res.json();
-      setData(json);
+      const url = params.days != null
+        ? `/api/admin/analytics?days=${params.days}`
+        : `/api/admin/analytics?from=${params.from}&to=${params.to}`;
+      const res = await fetch(url);
+      setData(await res.json());
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(days); }, [days]);
+  // initial load
+  useEffect(() => { load({ days: 7 }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function selectPreset(days: number) {
+    setActiveDays(days);
+    const from = daysAgoStr(days === 1 ? 0 : days);
+    const to   = todayStr();
+    setFromDate(from);
+    setToDate(to);
+    load({ days });
+  }
+
+  function applyCustomRange() {
+    if (!fromDate || !toDate) return;
+    setActiveDays(null);
+    load({ from: fromDate, to: toDate });
+  }
+
+  function handleFromChange(v: string) {
+    setFromDate(v);
+    setActiveDays(null);
+  }
+
+  function handleToChange(v: string) {
+    setToDate(v);
+    setActiveDays(null);
+  }
 
   const maxDay = data ? Math.max(...data.byDay.map((d) => d.count), 1) : 1;
-  const periodLabel = days === 1 ? "hoje" : `últimos ${days} dias`;
+
+  function periodLabel() {
+    if (activeDays === 1) return "hoje";
+    if (activeDays != null) return `últimos ${activeDays} dias`;
+    return `${fromDate} → ${toDate}`;
+  }
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Analytics</h1>
-          <p className="text-sm text-neutral-500 mt-1">Acessos, dispositivos, localização e mapa de calor</p>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-900">Analytics</h1>
+            <p className="text-sm text-neutral-500 mt-1">Acessos, dispositivos, localização e mapa de calor</p>
+          </div>
+          <button
+            onClick={() => activeDays != null ? load({ days: activeDays }) : load({ from: fromDate, to: toDate })}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-500 border border-neutral-200 rounded-lg hover:bg-neutral-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </button>
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Filtros de período */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Presets */}
           <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg">
             {PERIODS.map((p) => (
               <button
-                key={p.value}
-                onClick={() => setDays(p.value)}
+                key={p.days}
+                onClick={() => selectPreset(p.days)}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  days === p.value
+                  activeDays === p.days
                     ? "bg-white text-neutral-900 shadow-sm"
                     : "text-neutral-500 hover:text-neutral-700"
                 }`}
@@ -317,14 +372,43 @@ export default function AnalyticsPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => load(days)}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-500 border border-neutral-200 rounded-lg hover:bg-neutral-50 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            Atualizar
-          </button>
+
+          {/* Separador */}
+          <span className="text-neutral-300 text-sm">|</span>
+
+          {/* Data personalizada */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-500">De</span>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate}
+              onChange={(e) => handleFromChange(e.target.value)}
+              className={`text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors ${
+                activeDays === null ? "border-primary-400 bg-primary-50" : "border-neutral-200 bg-white"
+              }`}
+            />
+            <span className="text-xs text-neutral-500">até</span>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate}
+              max={todayStr()}
+              onChange={(e) => handleToChange(e.target.value)}
+              className={`text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors ${
+                activeDays === null ? "border-primary-400 bg-primary-50" : "border-neutral-200 bg-white"
+              }`}
+            />
+            {activeDays === null && (
+              <button
+                onClick={applyCustomRange}
+                disabled={loading || !fromDate || !toDate}
+                className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+              >
+                Aplicar
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -344,7 +428,7 @@ export default function AnalyticsPage() {
                 <span className="text-sm font-medium text-neutral-500">Visitantes únicos</span>
               </div>
               <p className="text-3xl font-bold text-neutral-900">{data.uniqueVisitors.toLocaleString("pt-BR")}</p>
-              <p className="text-xs text-neutral-400 mt-1">{periodLabel}</p>
+              <p className="text-xs text-neutral-400 mt-1">{periodLabel()}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
@@ -355,7 +439,7 @@ export default function AnalyticsPage() {
                 <span className="text-sm font-medium text-neutral-500">Pageviews</span>
               </div>
               <p className="text-3xl font-bold text-neutral-900">{data.pageViews.toLocaleString("pt-BR")}</p>
-              <p className="text-xs text-neutral-400 mt-1">{periodLabel}</p>
+              <p className="text-xs text-neutral-400 mt-1">{periodLabel()}</p>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
@@ -366,7 +450,7 @@ export default function AnalyticsPage() {
                 <span className="text-sm font-medium text-neutral-500">Cliques em botões</span>
               </div>
               <p className="text-3xl font-bold text-neutral-900">{data.totalClicks.toLocaleString("pt-BR")}</p>
-              <p className="text-xs text-neutral-400 mt-1">{periodLabel}</p>
+              <p className="text-xs text-neutral-400 mt-1">{periodLabel()}</p>
             </div>
           </div>
 

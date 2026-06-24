@@ -28,19 +28,35 @@ export async function GET(request: Request) {
   if (auth instanceof NextResponse) return auth;
 
   const { searchParams } = new URL(request.url);
-  const days = Math.min(Math.max(1, parseInt(searchParams.get("days") ?? "7")), 365);
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  // Support both ?days=N (preset) and ?from=YYYY-MM-DD&to=YYYY-MM-DD (custom range)
+  const fromParam = searchParams.get("from");
+  const toParam   = searchParams.get("to");
+
+  let since: string;
+  let until: string;
+
+  if (fromParam && toParam) {
+    since = new Date(fromParam + "T00:00:00").toISOString();
+    until = new Date(toParam  + "T23:59:59").toISOString();
+  } else {
+    const days = Math.min(Math.max(1, parseInt(searchParams.get("days") ?? "7")), 365);
+    since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    until = new Date().toISOString();
+  }
 
   const [allEvents, recentEvents] = await Promise.all([
     db()
       .from("page_events")
       .select("session_id, event_type, event_name, page_path, created_at, geo_state, click_x, click_y, device_type")
       .gte("created_at", since)
+      .lte("created_at", until)
       .order("created_at", { ascending: false }),
     db()
       .from("page_events")
       .select("session_id, event_type, event_name, page_path, created_at")
-      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte("created_at", since)
+      .lte("created_at", until)
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
@@ -163,7 +179,7 @@ export async function GET(request: Request) {
   const maxHeat = Math.max(...heatGrid.flat(), 1);
 
   return NextResponse.json({
-    period: `${days}d`,
+    period: fromParam && toParam ? `${fromParam}:${toParam}` : `${searchParams.get("days") ?? "7"}d`,
     uniqueVisitors: uniqueSessions,
     pageViews,
     totalClicks: clicks.length,
