@@ -1,22 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
+import { adminDb } from "@/lib/supabase/admin-db";
+
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function db(): any {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
-
-const VALID_STATUSES = ["novo", "contactado", "convertido", "descartado"];
+const VALID_STATUSES = ["novo", "contatado", "convertido", "descartado"];
 
 export async function GET() {
   const auth = await requireAdmin();
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await db()
+  const { data, error } = await adminDb()
     .from("leads")
     .select("*")
     .order("created_at", { ascending: false });
@@ -30,22 +23,26 @@ export async function PATCH(request: Request) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
-  const { id, status } = body;
+  const { id, status, notes } = body;
 
-  if (!id || !status) {
-    return NextResponse.json({ error: "id e status obrigatórios." }, { status: 400 });
+  if (!id) {
+    return NextResponse.json({ error: "id obrigatório." }, { status: 400 });
   }
 
-  if (!VALID_STATUSES.includes(status)) {
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
     return NextResponse.json(
       { error: `Status inválido. Valores aceitos: ${VALID_STATUSES.join(", ")}.` },
       { status: 400 }
     );
   }
 
-  const { error } = await db()
+  const updates: Record<string, string | null> = { updated_at: new Date().toISOString() };
+  if (status !== undefined) updates.status = status;
+  if (notes !== undefined) updates.notes = notes === "" ? null : String(notes).slice(0, 2000);
+
+  const { error } = await adminDb()
     .from("leads")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: "Erro ao atualizar lead." }, { status: 500 });
