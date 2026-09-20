@@ -24,7 +24,9 @@ Thumbs.db
 *.swp
 
 # AIOX Local (AIOX)
-.aiox-core/local/
+# A pasta inteira fica no disco, mas nao e versionada junto com o projeto:
+# sao ~1.100 arquivos que nao fazem parte do site e atrapalham qualquer busca.
+.aiox-core/
 .claude/settings.local.json
 .aiox/install-log.txt
 
