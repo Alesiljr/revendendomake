@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://revendendomake.com.br";
+// O domínio revendendomake.com.br ainda não existe (não resolve em DNS).
+// Hoje o site vive no endereço da Vercel. Quando o domínio próprio entrar,
+// basta definir NEXT_PUBLIC_SITE_URL e estes arquivos acompanham sozinhos.
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://revendendomake.vercel.app";
 
 // Só as páginas públicas. /admin, /login e /convite ficam de fora de propósito.
 const PAGINAS_PUBLICAS: Array<{
