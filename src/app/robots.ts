@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
 
-// O domínio revendendomake.com.br ainda não existe (não resolve em DNS).
-// Hoje o site vive no endereço da Vercel. Quando o domínio próprio entrar,
-// basta definir NEXT_PUBLIC_SITE_URL e estes arquivos acompanham sozinhos.
+// Domínio real do site, confirmado com o usuário em 20/09/2026.
+// Atenção: o `metadataBase` do layout.tsx ainda aponta para revendendomake.com.br,
+// que NÃO existe em DNS. Corrigir lá também quando for mexer naquele arquivo.
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://revendendomake.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.revendendomake.shop";
 
 export default function robots(): MetadataRoute.Robots {
   return {
