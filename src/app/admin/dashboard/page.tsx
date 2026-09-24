@@ -5,7 +5,7 @@ import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import {
   Users, MousePointerClick, Eye, TrendingUp, RefreshCw,
   MapPin, Flame, BarChart3, ExternalLink, CheckCircle, AlertCircle,
-  Smartphone, Monitor, Tablet, Globe, Clock,
+  Smartphone, Monitor, Tablet, Globe, Clock, Megaphone, Download,
 } from "lucide-react";
 
 const BR_GEO_URL =
@@ -23,6 +23,10 @@ interface HeatmapData { grid: number[][]; rows: number; cols: number; maxCount: 
 interface DeviceCount { device: "mobile" | "tablet" | "desktop"; count: number; pct: number }
 interface TrafficSource { source: string; count: number; pct: number }
 interface ScrollFunnelItem { milestone: number; sessions: number; pct: number }
+interface CampaignRow {
+  campaign: string; source: string; medium: string; content: string;
+  sessions: number; pageViews: number; clicks: number; whatsapp: number; forms: number;
+}
 
 interface AnalyticsData {
   period: string;
@@ -41,6 +45,8 @@ interface AnalyticsData {
   trafficSources: TrafficSource[];
   avgTimeOnPage: number;
   scrollFunnel: ScrollFunnelItem[];
+  campaigns: CampaignRow[];
+  hasAttribution: boolean;
 }
 
 const PERIODS = [
@@ -944,6 +950,11 @@ export default function AnalyticsPage() {
   function handleFromChange(v: string) { setFromDate(v); setActiveDays(null); }
   function handleToChange(v: string)   { setToDate(v);   setActiveDays(null); }
 
+  // Mesmo período que está na tela, para a planilha bater com o painel
+  function periodQuery() {
+    return activeDays != null ? `days=${activeDays}` : `from=${fromDate}&to=${toDate}`;
+  }
+
   const maxDay = data ? Math.max(...data.byDay.map((d) => d.count), 1) : 1;
 
   function periodLabel() {
@@ -1050,6 +1061,66 @@ export default function AnalyticsPage() {
                 <p className="text-xs text-neutral-400 mt-1">{periodLabel()}</p>
               </div>
             ))}
+          </div>
+
+          {/* ── Campanhas (origem do anúncio) ─────────────────────────────────── */}
+          <div className="bg-white rounded-2xl p-6 border border-neutral-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <Megaphone className="w-4 h-4 text-fuchsia-500" />
+              <h2 className="text-sm font-semibold text-neutral-700">Campanhas</h2>
+              <div className="ml-auto flex items-center gap-2">
+                <a
+                  href={`/api/admin/analytics/export?formato=campanhas&${periodQuery()}`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50"
+                >
+                  <Download className="w-3.5 h-3.5" /> Planilha por campanha
+                </a>
+                <a
+                  href={`/api/admin/analytics/export?formato=eventos&${periodQuery()}`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50"
+                >
+                  <Download className="w-3.5 h-3.5" /> Planilha detalhada
+                </a>
+              </div>
+            </div>
+            <p className="text-xs text-neutral-400 mb-4">
+              De qual anúncio o visitante veio — lido da etiqueta do link (utm) e do identificador de clique do anúncio.
+            </p>
+
+            {!data.hasAttribution ? (
+              <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                A coleta de origem ainda não está ligada no banco (falta rodar a migração 007).
+              </p>
+            ) : data.campaigns.length === 0 ? (
+              <p className="text-sm text-neutral-400">Nenhum acesso registrado neste período.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-neutral-400 border-b border-neutral-100">
+                      <th className="text-left font-medium py-2 pr-4">Campanha</th>
+                      <th className="text-left font-medium py-2 pr-4">Origem</th>
+                      <th className="text-right font-medium py-2 px-2">Visitantes</th>
+                      <th className="text-right font-medium py-2 px-2">Cliques</th>
+                      <th className="text-right font-medium py-2 px-2">WhatsApp</th>
+                      <th className="text-right font-medium py-2 pl-2">Formulários</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.campaigns.slice(0, 15).map((c) => (
+                      <tr key={`${c.campaign}|${c.source}|${c.medium}|${c.content}`} className="border-b border-neutral-50 last:border-0">
+                        <td className="py-2 pr-4 text-neutral-800 max-w-[220px] truncate" title={c.campaign}>{c.campaign}</td>
+                        <td className="py-2 pr-4 text-neutral-500">{c.source}</td>
+                        <td className="py-2 px-2 text-right font-medium text-neutral-900">{c.sessions}</td>
+                        <td className="py-2 px-2 text-right text-neutral-600">{c.clicks}</td>
+                        <td className="py-2 px-2 text-right text-green-600 font-medium">{c.whatsapp}</td>
+                        <td className="py-2 pl-2 text-right text-neutral-600">{c.forms}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* ── Fontes de tráfego ─────────────────────────────────────────────── */}

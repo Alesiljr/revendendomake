@@ -15,6 +15,44 @@ function getSessionId(): string {
   return sid;
 }
 
+const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
+
+/**
+ * Origem do visitante (de qual anúncio ele veio).
+ * As etiquetas só existem na URL de entrada; ao navegar para outra página elas
+ * somem — por isso ficam guardadas na sessão, igual ao session_id.
+ */
+function getAttribution(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const stored = sessionStorage.getItem("_rm_attr");
+    if (stored) {
+      const parsed = JSON.parse(stored) as Record<string, string>;
+      if (Object.keys(parsed).length > 0) return parsed;
+    }
+  } catch {
+    // sessionStorage indisponível ou conteúdo inválido — relê da URL
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const attr: Record<string, string> = {};
+  for (const key of UTM_KEYS) {
+    const value = params.get(key);
+    if (value) attr[key] = value.slice(0, 200);
+  }
+  // fbclid (Meta) e gclid (Google) identificam o clique no anúncio mesmo sem UTM
+  const clickId = params.get("fbclid") ?? params.get("gclid");
+  if (clickId) attr.click_id = clickId.slice(0, 255);
+
+  try {
+    sessionStorage.setItem("_rm_attr", JSON.stringify(attr));
+  } catch {
+    // sem sessionStorage a origem vale só para esta página
+  }
+  return attr;
+}
+
 function detectDevice(): "mobile" | "tablet" | "desktop" {
   const ua = navigator.userAgent;
   if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
@@ -25,7 +63,9 @@ function detectDevice(): "mobile" | "tablet" | "desktop" {
 function send(payload: Record<string, string | number>) {
   if (typeof window === "undefined") return;
   const session_id = getSessionId();
-  const body = JSON.stringify({ session_id, ...payload });
+  // "attention" dispara a cada 2s; repetir a origem nele só incharia a tabela
+  const attribution = payload.event_type === "attention" ? {} : getAttribution();
+  const body = JSON.stringify({ session_id, ...attribution, ...payload });
   // keepalive: true garante que o request sobrevive à navegação/saída da página
   try {
     fetch("/api/analytics", {
@@ -44,7 +84,7 @@ function send(payload: Record<string, string | number>) {
 function sendBeaconEvent(payload: Record<string, string | number>) {
   if (typeof window === "undefined") return;
   const session_id = getSessionId();
-  const body = JSON.stringify({ session_id, ...payload });
+  const body = JSON.stringify({ session_id, ...getAttribution(), ...payload });
   try {
     navigator.sendBeacon?.("/api/analytics", new Blob([body], { type: "application/json" }));
   } catch {

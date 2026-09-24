@@ -1,6 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
+import { adminDb } from "@/lib/supabase/admin-db";
+
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
+import { fetchEvents, groupByCampaign } from "@/lib/analytics/attribution";
 
 const BR_STATE_NAMES: Record<string, string> = {
   AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas",
@@ -14,14 +16,6 @@ const BR_STATE_NAMES: Record<string, string> = {
 
 const HEAT_ROWS = 20;
 const HEAT_COLS = 10;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function db(): any {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
 
 export async function GET(request: Request) {
   const auth = await requireAdmin();
@@ -46,13 +40,8 @@ export async function GET(request: Request) {
   }
 
   const [allEvents, recentEvents] = await Promise.all([
-    db()
-      .from("page_events")
-      .select("session_id, event_type, event_name, page_path, created_at, geo_state, click_x, click_y, device_type")
-      .gte("created_at", since)
-      .lte("created_at", until)
-      .order("created_at", { ascending: false }),
-    db()
+    fetchEvents(since, until),
+    adminDb()
       .from("page_events")
       .select("session_id, event_type, event_name, page_path, created_at")
       .gte("created_at", since)
@@ -63,6 +52,7 @@ export async function GET(request: Request) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const events: any[] = allEvents.data ?? [];
+  const campaigns = allEvents.hasAttribution ? groupByCampaign(events) : [];
 
   // ── Basic metrics ────────────────────────────────────────────────────────────
   const uniqueSessions = new Set(events.map((e) => e.session_id)).size;
@@ -166,6 +156,35 @@ export async function GET(request: Request) {
     pct: totalWithDevice > 0 ? Math.round(((deviceRaw[d] ?? 0) / totalWithDevice) * 100) : 0,
   }));
 
+  // ── Time on page ─────────────────────────────────────────────────────────────
+  const timeEvents = events.filter((e) => e.event_type === "time_on_page" && e.click_x != null);
+  const avgTimeOnPage = timeEvents.length > 0
+    ? Math.round(timeEvents.reduce((sum: number, e) => sum + Number(e.click_x), 0) / timeEvents.length)
+    : 0;
+
+  // ── Scroll depth funnel ───────────────────────────────────────────────────────
+  const MILESTONES = [25, 50, 75, 90, 100];
+  const scrollEvents = events.filter((e) => e.event_type === "scroll_depth");
+  const pageviewSessionsSet = new Set(
+    events.filter((e) => e.event_type === "pageview").map((e) => e.session_id)
+  );
+  const totalPageviewSessions = pageviewSessionsSet.size;
+
+  const scrollFunnel = MILESTONES.map((milestone) => {
+    const sessionsReached = new Set(
+      scrollEvents
+        .filter((e) => Number(e.click_y) >= milestone)
+        .map((e) => e.session_id)
+    ).size;
+    return {
+      milestone,
+      sessions: sessionsReached,
+      pct: totalPageviewSessions > 0
+        ? Math.round((sessionsReached / totalPageviewSessions) * 100)
+        : 0,
+    };
+  });
+
   // ── Click heatmap ────────────────────────────────────────────────────────────
   const heatGrid: number[][] = Array.from({ length: HEAT_ROWS }, () => new Array(HEAT_COLS).fill(0));
   clicks
@@ -193,5 +212,9 @@ export async function GET(request: Request) {
     deviceDistribution,
     totalWithDevice,
     trafficSources,
+    avgTimeOnPage,
+    scrollFunnel,
+    campaigns,
+    hasAttribution: allEvents.hasAttribution,
   });
 }
