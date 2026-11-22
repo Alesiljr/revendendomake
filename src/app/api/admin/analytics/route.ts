@@ -14,6 +14,13 @@ const BR_STATE_NAMES: Record<string, string> = {
   SP: "São Paulo", SE: "Sergipe", TO: "Tocantins",
 };
 
+// data-track dos botões da página inicial que apontam para checkout.perfectpay.com.br
+const CHECKOUT_BUTTONS = new Set([
+  "cta-howitworks-comecar-agora",
+  "cta-offer-garantir-minha-vaga",
+  "cta-final-quero-ser-revendedora-agora",
+]);
+
 const HEAT_ROWS = 20;
 const HEAT_COLS = 10;
 
@@ -58,6 +65,12 @@ export async function GET(request: Request) {
   const uniqueSessions = new Set(events.map((e) => e.session_id)).size;
   const pageViews = events.filter((e) => e.event_type === "pageview").length;
   const clicks = events.filter((e) => e.event_type === "click");
+
+  // ── Checkout: cliques nos botões que levam ao pagamento (PerfectPay) ─────────
+  // O pagamento acontece fora do site; o que dá para medir é quem clicou para ir pagar.
+  const checkoutClickEvents = clicks.filter((e) => CHECKOUT_BUTTONS.has(e.event_name ?? ""));
+  const checkoutClicks = checkoutClickEvents.length;
+  const checkoutSessions = new Set(checkoutClickEvents.map((e) => e.session_id)).size;
 
   // ── Top pages ────────────────────────────────────────────────────────────────
   const pageCounts: Record<string, number> = {};
@@ -202,6 +215,8 @@ export async function GET(request: Request) {
     uniqueVisitors: uniqueSessions,
     pageViews,
     totalClicks: clicks.length,
+    checkoutClicks,
+    checkoutSessions,
     topPages,
     topButtons,
     byDay,

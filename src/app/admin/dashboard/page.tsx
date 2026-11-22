@@ -5,7 +5,7 @@ import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import {
   Users, MousePointerClick, Eye, TrendingUp, RefreshCw,
   MapPin, Flame, BarChart3, ExternalLink, CheckCircle, AlertCircle,
-  Smartphone, Monitor, Tablet, Globe, Clock, Megaphone, Download,
+  Smartphone, Monitor, Tablet, Globe, Clock, Megaphone, Download, ShoppingCart,
 } from "lucide-react";
 
 const BR_GEO_URL =
@@ -33,6 +33,8 @@ interface AnalyticsData {
   uniqueVisitors: number;
   pageViews: number;
   totalClicks: number;
+  checkoutClicks: number;
+  checkoutSessions: number;
   topPages: TopPage[];
   topButtons: TopButton[];
   byDay: DayCount[];
@@ -1043,13 +1045,15 @@ export default function AnalyticsPage() {
       {data && (
         <>
           {/* ── KPI cards ────────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {[
               { label: "Visitantes únicos", value: data.uniqueVisitors.toLocaleString("pt-BR"),    Icon: Users,             bg: "bg-blue-50",   color: "text-blue-600"   },
               { label: "Pageviews",          value: data.pageViews.toLocaleString("pt-BR"),         Icon: Eye,               bg: "bg-purple-50", color: "text-purple-600" },
               { label: "Cliques em botões",  value: data.totalClicks.toLocaleString("pt-BR"),       Icon: MousePointerClick, bg: "bg-pink-50",   color: "text-pink-600"   },
+              { label: "Foram ao checkout",  value: (data.checkoutSessions ?? 0).toLocaleString("pt-BR"), Icon: ShoppingCart, bg: "bg-emerald-50", color: "text-emerald-600",
+                note: `${(data.checkoutClicks ?? 0).toLocaleString("pt-BR")} cliques · ${data.uniqueVisitors > 0 ? Math.round(((data.checkoutSessions ?? 0) / data.uniqueVisitors) * 100) : 0}% dos visitantes` },
               { label: "Tempo médio/página", value: data.avgTimeOnPage > 0 ? formatTime(data.avgTimeOnPage) : "—", Icon: Clock, bg: "bg-amber-50", color: "text-amber-600" },
-            ].map(({ label, value, Icon, bg, color }) => (
+            ].map(({ label, value, Icon, bg, color, note }: { label: string; value: string; Icon: typeof Users; bg: string; color: string; note?: string }) => (
               <div key={label} className="bg-white rounded-2xl p-4 md:p-6 border border-neutral-100 shadow-sm">
                 <div className="flex items-center gap-2 md:gap-3 mb-3">
                   <div className={`w-8 h-8 md:w-9 md:h-9 rounded-xl ${bg} ${color} flex items-center justify-center shrink-0`}>
@@ -1058,7 +1062,7 @@ export default function AnalyticsPage() {
                   <span className="text-xs md:text-sm font-medium text-neutral-500 leading-tight">{label}</span>
                 </div>
                 <p className="text-2xl md:text-3xl font-bold text-neutral-900">{value}</p>
-                <p className="text-xs text-neutral-400 mt-1">{periodLabel()}</p>
+                <p className="text-xs text-neutral-400 mt-1">{note ? `${note} · ${periodLabel()}` : periodLabel()}</p>
               </div>
             ))}
           </div>
