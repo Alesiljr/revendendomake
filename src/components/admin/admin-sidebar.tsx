@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Package, Users, Star, FileText,
-  Settings, Sparkles, BarChart2, UserCog,
+  Settings, Sparkles, BarChart2,
   Menu, X, ExternalLink, LogOut,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -16,7 +16,6 @@ const navItems = [
   { href: "/admin/leads",         label: "CRM",            icon: Users },
   { href: "/admin/depoimentos",   label: "Depoimentos",    icon: Star },
   { href: "/admin/blog",          label: "Blog",           icon: FileText },
-  { href: "/admin/usuarios",      label: "Usuários",       icon: UserCog },
   { href: "/admin/configuracoes", label: "Configurações",  icon: Settings },
 ];
 
