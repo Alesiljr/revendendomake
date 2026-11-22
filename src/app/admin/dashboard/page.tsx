@@ -1045,24 +1045,25 @@ export default function AnalyticsPage() {
       {data && (
         <>
           {/* ── KPI cards ────────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {[
-              { label: "Visitantes únicos", value: data.uniqueVisitors.toLocaleString("pt-BR"),    Icon: Users,             bg: "bg-blue-50",   color: "text-blue-600"   },
-              { label: "Pageviews",          value: data.pageViews.toLocaleString("pt-BR"),         Icon: Eye,               bg: "bg-purple-50", color: "text-purple-600" },
-              { label: "Cliques em botões",  value: data.totalClicks.toLocaleString("pt-BR"),       Icon: MousePointerClick, bg: "bg-pink-50",   color: "text-pink-600"   },
-              { label: "Foram ao checkout",  value: (data.checkoutSessions ?? 0).toLocaleString("pt-BR"), Icon: ShoppingCart, bg: "bg-emerald-50", color: "text-emerald-600",
-                note: `${(data.checkoutClicks ?? 0).toLocaleString("pt-BR")} cliques · ${data.uniqueVisitors > 0 ? Math.round(((data.checkoutSessions ?? 0) / data.uniqueVisitors) * 100) : 0}% dos visitantes` },
-              { label: "Tempo médio/página", value: data.avgTimeOnPage > 0 ? formatTime(data.avgTimeOnPage) : "—", Icon: Clock, bg: "bg-amber-50", color: "text-amber-600" },
-            ].map(({ label, value, Icon, bg, color, note }: { label: string; value: string; Icon: typeof Users; bg: string; color: string; note?: string }) => (
-              <div key={label} className="bg-white rounded-2xl p-4 md:p-6 border border-neutral-100 shadow-sm">
-                <div className="flex items-center gap-2 md:gap-3 mb-3">
-                  <div className={`w-8 h-8 md:w-9 md:h-9 rounded-xl ${bg} ${color} flex items-center justify-center shrink-0`}>
-                    <Icon className="w-4 h-4 md:w-5 md:h-5" />
+              { label: "Visitantes",  title: "Visitantes únicos",  value: data.uniqueVisitors.toLocaleString("pt-BR"), Icon: Users,             bg: "bg-blue-50",    color: "text-blue-600"    },
+              { label: "Pageviews",   title: "Páginas vistas",     value: data.pageViews.toLocaleString("pt-BR"),      Icon: Eye,               bg: "bg-purple-50",  color: "text-purple-600"  },
+              { label: "Cliques",     title: "Cliques em botões",  value: data.totalClicks.toLocaleString("pt-BR"),    Icon: MousePointerClick, bg: "bg-pink-50",    color: "text-pink-600"    },
+              { label: "Checkout",    title: "Pessoas que clicaram para ir ao pagamento (PerfectPay)",
+                value: (data.checkoutSessions ?? 0).toLocaleString("pt-BR"), Icon: ShoppingCart, bg: "bg-emerald-50", color: "text-emerald-600",
+                note: `${data.uniqueVisitors > 0 ? Math.round(((data.checkoutSessions ?? 0) / data.uniqueVisitors) * 100) : 0}% · ${(data.checkoutClicks ?? 0).toLocaleString("pt-BR")} cliques` },
+              { label: "Tempo médio", title: "Tempo médio por página", value: data.avgTimeOnPage > 0 ? formatTime(data.avgTimeOnPage) : "—", Icon: Clock, bg: "bg-amber-50", color: "text-amber-600" },
+            ].map(({ label, title, value, Icon, bg, color, note }: { label: string; title: string; value: string; Icon: typeof Users; bg: string; color: string; note?: string }) => (
+              <div key={label} title={title} className="min-w-0 bg-white rounded-xl px-4 py-3 border border-neutral-100 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-medium text-neutral-500">{label}</span>
+                  <div className={`w-6 h-6 rounded-lg ${bg} ${color} flex lg:hidden xl:flex items-center justify-center shrink-0`}>
+                    <Icon className="w-3.5 h-3.5" />
                   </div>
-                  <span className="text-xs md:text-sm font-medium text-neutral-500 leading-tight">{label}</span>
                 </div>
-                <p className="text-2xl md:text-3xl font-bold text-neutral-900">{value}</p>
-                <p className="text-xs text-neutral-400 mt-1">{note ? `${note} · ${periodLabel()}` : periodLabel()}</p>
+                <p className="mt-1 text-2xl font-bold text-neutral-900 leading-tight truncate">{value}</p>
+                <p className="mt-0.5 truncate text-[11px] text-neutral-400">{note ?? periodLabel()}</p>
               </div>
             ))}
           </div>
