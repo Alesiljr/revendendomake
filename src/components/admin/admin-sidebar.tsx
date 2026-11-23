@@ -1,14 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Package, Users, Star, FileText,
   Settings, Sparkles, BarChart2,
-  Menu, X, ExternalLink, LogOut,
+  Menu, X, ExternalLink, LogOut, LayoutGrid,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+// Menu "Sistemas" (23/11/2026): só a dona recebe a lista (o servidor decide em /api/admin/sistemas); para as outras
+// contas a lista vem vazia e o menu não aparece.
+type Sistema = { nome: string; url: string; logo: string; atual: boolean };
+
+function SistemasDona({ sistemas }: { sistemas: Sistema[] }) {
+  if (sistemas.length === 0) return null;
+  return (
+    <details className="group">
+      <summary className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-neutral-500 hover:text-primary-700 hover:bg-primary-50 transition-colors cursor-pointer list-none">
+        <LayoutGrid className="w-4 h-4" />
+        Sistemas
+      </summary>
+      <nav aria-label="Trocar de sistema" className="mt-1 ml-4 space-y-0.5">
+        {sistemas.map((s) => (
+          <a
+            key={s.nome}
+            href={s.url}
+            aria-current={s.atual ? "page" : undefined}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              s.atual ? "text-primary-700 font-medium" : "text-neutral-500 hover:text-primary-700 hover:bg-primary-50"
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo pequeno em data: URI */}
+            <img src={s.logo} alt="" width={14} height={14} />
+            {s.nome}
+          </a>
+        ))}
+      </nav>
+    </details>
+  );
+}
 
 const navItems = [
   { href: "/admin/dashboard",     label: "Dashboard",      icon: BarChart2 },
@@ -19,7 +51,7 @@ const navItems = [
   { href: "/admin/configuracoes", label: "Configurações",  icon: Settings },
 ];
 
-function NavLinks({ onClose, demoMode }: { onClose?: () => void; demoMode: boolean }) {
+function NavLinks({ onClose, demoMode, sistemas }: { onClose?: () => void; demoMode: boolean; sistemas: Sistema[] }) {
   const pathname = usePathname();
   const router   = useRouter();
 
@@ -55,6 +87,7 @@ function NavLinks({ onClose, demoMode }: { onClose?: () => void; demoMode: boole
       </nav>
 
       <div className="p-4 border-t border-neutral-100 space-y-1">
+        <SistemasDona sistemas={sistemas} />
         <Link
           href="/"
           target="_blank"
@@ -92,6 +125,17 @@ function SidebarLogo() {
 
 export function AdminSidebar({ demoMode }: { demoMode: boolean }) {
   const [open, setOpen] = useState(false);
+  const [sistemas, setSistemas] = useState<Sistema[]>([]);
+
+  useEffect(() => {
+    if (demoMode) return;
+    let vivo = true;
+    fetch("/api/admin/sistemas", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { sistemas: [] }))
+      .then((j: { sistemas?: Sistema[] }) => { if (vivo && Array.isArray(j.sistemas)) setSistemas(j.sistemas); })
+      .catch(() => null);
+    return () => { vivo = false; };
+  }, [demoMode]);
 
   return (
     <>
@@ -134,7 +178,7 @@ export function AdminSidebar({ demoMode }: { demoMode: boolean }) {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <NavLinks onClose={() => setOpen(false)} demoMode={demoMode} />
+            <NavLinks onClose={() => setOpen(false)} demoMode={demoMode} sistemas={sistemas} />
           </div>
         </div>
       )}
@@ -142,7 +186,7 @@ export function AdminSidebar({ demoMode }: { demoMode: boolean }) {
       {/* ── Desktop sidebar ────────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 min-h-screen bg-white border-r border-neutral-200 sticky top-0 self-start">
         <SidebarLogo />
-        <NavLinks demoMode={demoMode} />
+        <NavLinks demoMode={demoMode} sistemas={sistemas} />
       </aside>
     </>
   );

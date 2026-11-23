@@ -30,5 +30,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return { supabaseResponse, user };
+  // `resposta()` devolve a resposta mais nova: um signOut depois daqui troca a resposta (cookies apagados).
+  return { supabaseResponse, user, supabase, resposta: () => supabaseResponse };
 }

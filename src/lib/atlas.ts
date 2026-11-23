@@ -93,7 +93,8 @@ async function perguntar(conta: string): Promise<boolean | null> {
   } catch { return null; }
 }
 
-type Ac = { t: "ac"; u: string; exp: number };
+// p (23/11/2026): "o" = dona, "e" = editora. O middleware só aceita o cookie com p (diz se pede o liberado da dona).
+export type Ac = { t: "ac"; u: string; exp: number; p?: "o" | "e" };
 
 /**
  * Confere a conta (não chamar para a dona). `travada` = mandar para a página de acesso não liberado.
@@ -106,5 +107,5 @@ export async function conferirAcesso(valorCookie: string | undefined, userId: st
   const ok = await perguntar(email.toLowerCase().trim());
   if (ok !== null) await acertarPainel(userId, email.toLowerCase().trim(), ok);
   if (ok === false) return { travada: true, cookie: null };
-  return { travada: false, cookie: await assinar({ t: "ac", u: userId, exp: agora + (ok ? LIBERADA : FORA) }) };
+  return { travada: false, cookie: await assinar({ t: "ac", u: userId, exp: agora + (ok ? LIBERADA : FORA), p: "e" }) };
 }
